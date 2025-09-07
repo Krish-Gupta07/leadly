@@ -1,0 +1,6 @@
+asyncpraw
+python-dotenv
+sqlalchemy
+asyncpg
+google-genai
+schedule
