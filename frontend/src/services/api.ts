@@ -33,6 +33,7 @@ export interface Lead {
   post_text: string | null;
   url: string;
   subreddit_name: string;
+  category: string;
   created_at: string;
   updated_at: string;
 }
@@ -62,27 +63,27 @@ export interface SearchRequest {
 }
 
 export const searchLeads = async (request: SearchRequest): Promise<SearchResult> => {
-  const response = await api.post('/api/v1/reddit/search', request);
+  const response = await api.post('/reddit/search', request);
   return response.data;
 };
 
 export const getSearchStatus = async (jobId: string): Promise<SearchJobStatus> => {
-  const response = await api.get(`/api/v1/reddit/search/${jobId}`);
+  const response = await api.get(`/reddit/search/${jobId}`);
   return response.data;
 };
 
 export const getLeads = async (): Promise<Lead[]> => {
-  const response = await api.get('/api/v1/leads');
+  const response = await api.get('/leads');
   return response.data.leads;
 };
 
 export const getSubreddits = async (): Promise<string[]> => {
-  const response = await api.get('/api/v1/config/subreddits');
+  const response = await api.get('/config/subreddits');
   return response.data.subreddits;
 };
 
 export const addSubreddit = async (subreddit: string): Promise<void> => {
-  await api.post('/api/v1/config/subreddits', { subreddit });
+  await api.post('/config/subreddits', { subreddit });
 };
 
 // Function to set API key
@@ -98,7 +99,7 @@ export const getApiKey = (): string | null => {
 // Test connectivity function
 export const testConnectivity = async (): Promise<boolean> => {
   try {
-    const response = await api.get('/api/v1/health');
+    const response = await api.get('/health');
     return response.status === 200;
   } catch (error) {
     return false;

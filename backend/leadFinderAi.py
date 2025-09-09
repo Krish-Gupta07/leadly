@@ -36,9 +36,20 @@ def find_leads(user_query: str, posts_dict: list, posts_comments: list):
 
     Problem-Fit: Does the author express a frustration or a need that directly matches the pain points the user's service solves?
 
-    Buying Intent: Is the author actively seeking a solution, asking for recommendations, looking to hire someone, or complaining about a lack of a solution?
+    Buying Intent: Is the author actively seeking a solution, asking for recommendations, looking to hire someone, or complaining about a lack of a solution? ALSO consider indirect expressions of need such as:
+    - Describing a problem they're currently facing without explicitly asking for help
+    - Mentioning they're using an inadequate solution or workaround
+    - Expressing frustration with their current process
+    - Talking about wanting to improve or optimize something
+    - Discussing challenges or pain points in their workflow
 
-    Semantic Similarity: Go beyond literal keyword matching. The author might describe a problem using different words, but the meaning should align with the user's service. For example, if the user sells a "social media scheduling tool," a lead might say, "I'm so tired of posting to Instagram manually every day."
+    Semantic Similarity: Go beyond literal keyword matching. The author might describe a problem using different words, but the meaning should align with the user's service. For example, if the user sells a "social media scheduling tool," a lead might say, "I'm so tired of posting to Instagram manually every day." Similarly, if the user offers "inventory management software," a lead might say "I'm looking for inventory management SaaS" or "I need help tracking my products."
+
+    Cold Lead Identification: Specifically look for "cold leads" - people who are not actively asking for help but are clearly expressing a need that the user's service could solve:
+    - Implicit needs: "I spend 5 hours a week on inventory tracking" (implies need for automation)
+    - Unmet needs: "I wish there was a better way to manage my SKUs" (expresses desire for a solution)
+    - Pain points: "Our current inventory system is a mess" (indicates need for improvement)
+    - Adjacent mentions: "I'm looking for inventory management SaaS" (direct but may not be actively hiring)
 
     Qualify and Filter: Based on your analysis, qualify each piece of content. A strong lead is an actionable opportunity. You must filter out the following:
 
@@ -62,12 +73,12 @@ def find_leads(user_query: str, posts_dict: list, posts_comments: list):
 
     [
       {
-        "post_id": "post_111",
-        "data": { "Title": "Looking for recommendations for a good YouTube editor for my gaming channel.", "post_text": "My channel is growing but I can't keep up with the editing. Need someone who understands pacing and memes.", "url": "/r/youtubers/post_111" }
+        "post_id": "111",
+        "data": { "Title": "Looking for recommendations for a good YouTube editor for my gaming channel.", "post_text": "My channel is growing but I can't keep up with the editing. Need someone who understands pacing and memes.", "url": "/r/youtubers/111" }
       },
       {
-        "post_id": "post_222",
-        "data": { "Title": "I am a video editor available for hire!", "post_text": "I can edit your videos, DM me for rates.", "url": "/r/forhire/post_222" }
+        "post_id": "222",
+        "data": { "Title": "I am a video editor available for hire!", "post_text": "I can edit your videos, DM me for rates.", "url": "/r/forhire/222" }
       }
     ]
     comments:
@@ -76,11 +87,11 @@ def find_leads(user_query: str, posts_dict: list, posts_comments: list):
 
     [
       {
-        "comment_id": "comment_888",
+        "comment_id": "888",
         "data": { "comment_text": "Ugh, I spend more time editing my TikToks than filming them. It's exhausting, I wish I could just hand the footage off to someone." }
       },
       {
-        "comment_id": "comment_999",
+        "comment_id": "999",
         "data": { "comment_text": "Yeah, Adobe Premiere Pro is definitely the industry standard for a reason." }
       }
     ]
@@ -91,14 +102,16 @@ def find_leads(user_query: str, posts_dict: list, posts_comments: list):
     {
       "post_leads": [
         {
-          "id": "post_111",
-          "description": "User is explicitly looking to hire a YouTube editor and mentions needing good pacing, a direct match for the service."
+          "id": "111",
+          "description": "User is explicitly looking to hire a YouTube editor and mentions needing good pacing, a direct match for the service.",
+          "category": "hot"  # Explicit request for service
         }
       ],
       "comment_leads": [
         {
-          "id": "comment_888",
-          "description": "User expresses a clear pain point (editing takes too long) and a desire to delegate, making them an ideal lead."
+          "id": "888",
+          "description": "User expresses a clear pain point (editing takes too long) and a desire to delegate, making them an ideal lead.",
+          "category": "cold"  # Implicit need without explicit request
         }
       ]
     }
@@ -116,6 +129,14 @@ def find_leads(user_query: str, posts_dict: list, posts_comments: list):
 
     If no leads are found for a specific category, you MUST return an empty array [] for that key.
 
+    Each lead object MUST include:
+    - "id": The post or comment ID
+    - "description": A brief explanation of why this is a lead
+    - "category": Classification as "hot", "cold", or "neutral"
+      - "hot": Explicit requests for services, clear buying intent
+      - "cold": Implicit needs, pain points, expressions of desire for improvement
+      - "neutral": General discussions that might be relevant but less actionable
+
     2. IF you find ZERO potential leads (from both posts AND comments):
 
     You MUST NOT return a JSON object, an empty object, or any JSON formatting.
@@ -132,7 +153,13 @@ def find_leads(user_query: str, posts_dict: list, posts_comments: list):
 
     Base your analysis strictly on the provided user_query and the content arrays. Do not invent information or make assumptions beyond the text."""
 
-    prompt = f"{system_prompt}\n\nUser request: {user_query}\n\nPosts data: {posts_dict}\n\nComments data: {posts_comments}"
+    prompt = f"""{system_prompt}
+
+User request: {user_query}
+
+Posts data: {posts_dict}
+
+Comments data: {posts_comments}"""
     
     try:
         response = client.models.generate_content(

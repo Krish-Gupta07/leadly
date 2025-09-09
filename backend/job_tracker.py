@@ -26,10 +26,21 @@ class SearchJob:
 
     def update_status(self, status: JobStatus):
         self.status = status
+        # When marking as completed, also set progress to 100
+        if status == JobStatus.COMPLETED:
+            self.progress = 100
         self.updated_at = datetime.utcnow()
 
     def update_progress(self, progress: int):
-        self.progress = progress
+        # Ensure progress doesn't go backwards unless we're resetting
+        if progress >= self.progress or progress == 0:
+            self.progress = progress
+        self.updated_at = datetime.utcnow()
+
+    def mark_completed(self):
+        """Explicitly mark job as completed with proper progress"""
+        self.status = JobStatus.COMPLETED
+        self.progress = 100
         self.updated_at = datetime.utcnow()
 
     def update_results(self, posts_processed: int = 0, comments_processed: int = 0, leads_found: int = 0):

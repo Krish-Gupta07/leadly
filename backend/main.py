@@ -11,7 +11,7 @@ from db import (
     get_leads as db_get_leads,
 )
 from controller import LeadlyController
-from job_tracker import create_job, get_job, JobStatus
+from job_tracker import create_job, get_job
 from scheduler import run_scheduled_job
 from task_manager import task_manager
 
@@ -59,6 +59,7 @@ class LeadResponse(BaseModel):
     post_text: Optional[str]
     url: str
     subreddit_name: str
+    category: str  # Add category field
     created_at: datetime
     updated_at: datetime
 
@@ -203,9 +204,7 @@ async def health_check():
     return HealthResponse(status="ok", timestamp=datetime.utcnow())
 
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+# Get leads
 @app.get("/api/v1/leads", response_model=LeadsResponse)
 async def get_leads(
     limit: int = 100,
@@ -228,6 +227,7 @@ async def get_leads(
             post_text=lead.post_text,
             url=lead.url,
             subreddit_name=lead.subreddit_name,
+            category=lead.category,
             created_at=lead.created_at,
             updated_at=lead.updated_at,
         )
@@ -296,7 +296,7 @@ async def manual_lead_search(
             )
         )
         print(f"Created task {task} for job {job.job_id}")
-        
+
         # Add task to task manager
         task_manager.add_task(job.job_id, task)
 
@@ -312,6 +312,7 @@ async def manual_lead_search(
     except Exception as e:
         print(f"Failed to initiate search: {str(e)}")
         import traceback
+
         traceback.print_exc()
         raise HTTPException(
             status_code=500, detail=f"Failed to initiate search: {str(e)}"

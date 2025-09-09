@@ -3,13 +3,13 @@ import re
 
 def process_ai_output(ai_output):
     """
-    Takes the output of the AI as input and creates a mapping of URLs to descriptions.
+    Takes the output of the AI as input and creates a mapping of identifiers to descriptions and categories.
     
     Args:
         ai_output: The raw output from the AI (could be JSON string or dict, or plain text)
         
     Returns:
-        dict: A dictionary with URLs as keys and AI descriptions as values
+        dict: A dictionary with identifiers as keys and AI descriptions/categories as values
     """
     # Handle case where AI returns plain text (no leads found)
     if isinstance(ai_output, str):
@@ -50,18 +50,26 @@ def process_ai_output(ai_output):
     if post_leads:
         for lead in post_leads:
             if 'id' in lead and 'description' in lead:
-                # Create a URL-like key using the ID for posts
-                url_key = f"https://reddit.com/comments/{lead['id']}"
-                url_description_map[url_key] = lead['description']
+                # For posts, we'll store the post ID and description
+                # The full URL will be constructed later when we have subreddit info
+                url_key = lead['id']  # Use the actual post ID without prefix
+                url_description_map[url_key] = {
+                    'description': lead['description'],
+                    'category': lead.get('category', 'neutral')
+                }
     
     # Process comment leads
     comment_leads = ai_data.get('comment_leads', [])
     if comment_leads:
         for lead in comment_leads:
             if 'id' in lead and 'description' in lead:
-                # Create a URL-like key using the ID for comments
-                url_key = f"https://reddit.com/comments/{lead['id']}"
-                url_description_map[url_key] = lead['description']
+                # For comments, we'll store the comment ID and description
+                # The full URL will be constructed later when we have subreddit and post info
+                url_key = lead['id']  # Use the actual comment ID without prefix
+                url_description_map[url_key] = {
+                    'description': lead['description'],
+                    'category': lead.get('category', 'neutral')
+                }
     
     return url_description_map
 
@@ -71,14 +79,16 @@ if __name__ == "__main__":
     test_output1 = {
         "post_leads": [
             {
-                "id": "post_111",
-                "description": "User is explicitly looking to hire a YouTube editor and mentions needing good pacing, a direct match for the service."
+                "id": "111",
+                "description": "User is explicitly looking to hire a YouTube editor and mentions needing good pacing, a direct match for the service.",
+                "category": "hot"
             }
         ],
         "comment_leads": [
             {
-                "id": "comment_888",
-                "description": "User expresses a clear pain point (editing takes too long) and a desire to delegate, making them an ideal lead."
+                "id": "888",
+                "description": "User expresses a clear pain point (editing takes too long) and a desire to delegate, making them an ideal lead.",
+                "category": "cold"
             }
         ]
     }
@@ -107,7 +117,8 @@ if __name__ == "__main__":
   "post_leads": [
     {
       "id": "1nak9eg",
-      "description": "User is explicitly hiring a designer for a new D2C brand to create social media creatives, a direct match for graphic design services."
+      "description": "User is explicitly hiring a designer for a new D2C brand to create social media creatives, a direct match for graphic design services.",
+      "category": "hot"
     }
   ],
   "comment_leads": []
@@ -116,3 +127,24 @@ if __name__ == "__main__":
     
     result4 = process_ai_output(test_output4)
     print("Test 4 result:", result4)
+    
+    # Test case 5: Cold leads example
+    test_output5 = {
+        "post_leads": [
+            {
+                "id": "123",
+                "description": "User mentions looking for inventory management SaaS, which is a direct but cold lead for inventory management software.",
+                "category": "hot"
+            }
+        ],
+        "comment_leads": [
+            {
+                "id": "456",
+                "description": "User spends significant time on inventory tracking, indicating a need for automation - a cold lead.",
+                "category": "cold"
+            }
+        ]
+    }
+    
+    result5 = process_ai_output(test_output5)
+    print("Test 5 result (cold leads):", result5)

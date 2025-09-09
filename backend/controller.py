@@ -8,17 +8,24 @@ import os
 import re
 from dotenv import load_dotenv
 from job_tracker import JobStatus
-from job_tracker import get_job, JobStatus
+from job_tracker import get_job
 
 load_dotenv()
 
 
 class LeadlyController:
     def __init__(self):
+        # Process the DATABASE_URL to handle sslmode parameter correctly
+        database_url = os.getenv("DATABASE_URL") or ""
+        # Replace postgresql: with postgresql+asyncpg:
+        database_url = re.sub(r"^postgresql:", "postgresql+asyncpg:", database_url)
+        # Remove sslmode parameter as it's not handled directly by asyncpg
+        database_url = re.sub(r"\?sslmode=require$", "", database_url)
+        database_url = re.sub(r"&sslmode=require", "", database_url)
+        database_url = re.sub(r"\?sslmode=require&", "?", database_url)
+
         self.engine = create_async_engine(
-            re.sub(
-                r"^postgresql:", "postgresql+asyncpg:", os.getenv("DATABASE_URL") or ""
-            ),
+            database_url,
             echo=True,
         )
         self.SessionLocal = async_sessionmaker(bind=self.engine)
@@ -47,10 +54,9 @@ class LeadlyController:
 
             # Step 1: Extract data from Reddit
             print("Extracting data from Reddit...")
-            if job:
-                job.update_progress(20)
+            # Don't update progress here immediately, let get_reddit_data handle it
 
-            posts_dict, posts_comments = await get_reddit_data(subreddits)
+            posts_dict, posts_comments = await get_reddit_data(subreddits, job)
             print(
                 f"Extracted {len(posts_dict)} posts and {len(posts_comments)} comments"
             )
@@ -60,7 +66,10 @@ class LeadlyController:
                     posts_processed=len(posts_dict),
                     comments_processed=len(posts_comments),
                 )
-                job.update_progress(40)
+                # Ensure we don't go backwards in progress
+                current_progress = job.progress
+                if 40 > current_progress:
+                    job.update_progress(40)
 
             # Step 2: Find leads using AI
             print("Finding leads with AI...")
@@ -68,7 +77,10 @@ class LeadlyController:
             print("AI analysis complete")
 
             if job:
-                job.update_progress(60)
+                # Ensure we don't go backwards in progress
+                current_progress = job.progress
+                if 60 > current_progress:
+                    job.update_progress(60)
 
             # Step 3: Process AI output to create URL-description mapping
             print("Processing AI output...")
@@ -77,15 +89,93 @@ class LeadlyController:
 
             if job:
                 job.update_results(leads_found=len(url_description_map))
-                job.update_progress(80)
+                # Ensure we don't go backwards in progress
+                current_progress = job.progress
+                if 80 > current_progress:
+                    job.update_progress(80)
 
-            # Step 4: Save leads to database
+            # Step 4: Save leads to database with proper URLs, subreddit names, and categories
             print("Saving leads to database...")
-            await save_leads(url_description_map)
+            # Create a mapping of IDs to full information for URL construction
+            id_to_info = {}
+            
+            # Map post IDs to their full information
+            for post in posts_dict:
+                id_to_info[post["post_id"]] = {
+                    "type": "post",
+                    "subreddit": post["subreddit"],
+                    "url": post["data"].get("url", "")
+                }
+            
+            # Map comment IDs to their full information
+            for comment in posts_comments:
+                id_to_info[comment["comment_id"]] = {
+                    "type": "comment",
+                    "subreddit": comment["subreddit"],
+                    "post_id": comment.get("post_id", "")  # This will be added later
+                }
+            
+            # Update comment entries with their post IDs
+            for post in posts_dict:
+                post_id = post["post_id"]
+                # Find comments that belong to this post
+                for comment in posts_comments:
+                    if comment.get("post_id") == post_id:
+                        id_to_info[comment["comment_id"]]["post_id"] = post_id
+            
+            # Construct proper URLs and save leads
+            final_url_description_map = {}
+            subreddit_for_saving = subreddits[0] if subreddits else "unknown"
+            
+            # Separate leads by category for saving with proper URLs
+            hot_leads = {}
+            cold_leads = {}
+            neutral_leads = {}
+            
+            for identifier, data in url_description_map.items():
+                description = data['description']
+                category = data.get('category', 'neutral')
+                
+                # Construct proper URL based on the identifier
+                if identifier in id_to_info:
+                    info = id_to_info[identifier]
+                    if info["type"] == "post":
+                        # For posts, use the actual post URL
+                        url = info.get("url", f"https://www.reddit.com/r/{info['subreddit']}/comments/{identifier}")
+                    else:
+                        # For comments, construct the comment URL
+                        post_id = info.get("post_id", "")
+                        url = f"https://www.reddit.com/r/{info['subreddit']}/comments/{post_id}/_/{identifier}"
+                else:
+                    # Fallback URL if we don't have info
+                    url = f"https://www.reddit.com/comments/{identifier}"
+                
+                # Create a description that includes the URL
+                full_description = f"{description}\n\nURL: {url}"
+                
+                # Add to appropriate category dictionary
+                if category == "hot":
+                    hot_leads[identifier] = full_description
+                elif category == "cold":
+                    cold_leads[identifier] = full_description
+                else:
+                    neutral_leads[identifier] = full_description
+            
+            # Save leads by category
+            if hot_leads:
+                await save_leads(hot_leads, subreddits, "hot")
+            if cold_leads:
+                await save_leads(cold_leads, subreddits, "cold")
+            if neutral_leads:
+                await save_leads(neutral_leads, subreddits, "neutral")
+            
             print("Leads saved successfully")
 
             if job:
-                job.update_progress(90)
+                # Ensure we don't go backwards in progress
+                current_progress = job.progress
+                if 90 > current_progress:
+                    job.update_progress(90)
 
             # Step 5: Save scanned subreddits
             if subreddits:
@@ -93,15 +183,16 @@ class LeadlyController:
                     await save_scanned_subreddit(subreddit)
 
             if job:
-                job.update_status(JobStatus.COMPLETED)
-                job.update_progress(100)
+                job.mark_completed()
 
             return url_description_map
 
         except Exception as e:
             print(f"Error in lead finder: {e}")
             if job:
-                job.set_error(str(e))
+                # Only set error if job is not already completed
+                if job.status != JobStatus.COMPLETED:
+                    job.set_error(str(e))
             return {}
 
     async def scheduled_run(self, user_query: str):

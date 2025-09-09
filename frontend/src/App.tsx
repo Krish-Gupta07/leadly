@@ -116,6 +116,93 @@ function App() {
     }
   };
 
+  // Group leads by category
+  const groupLeadsByCategory = (leads: Lead[]) => {
+    return leads.reduce((acc, lead) => {
+      const category = lead.category || 'neutral';
+      if (!acc[category]) {
+        acc[category] = [];
+      }
+      acc[category].push(lead);
+      return acc;
+    }, {} as Record<string, Lead[]>);
+  };
+
+  // Get category display name
+  const getCategoryDisplayName = (category: string) => {
+    switch (category) {
+      case 'hot': return 'Hot Leads';
+      case 'cold': return 'Cold Leads';
+      case 'neutral': return 'Neutral Leads';
+      default: return `${category.charAt(0).toUpperCase() + category.slice(1)} Leads`;
+    }
+  };
+
+  // Get category color
+  const getCategoryColor = (category: string) => {
+    switch (category) {
+      case 'hot': return '#ef4444'; // red
+      case 'cold': return '#3b82f6'; // blue
+      case 'neutral': return '#6b7280'; // gray
+      default: return '#10b981'; // green
+    }
+  };
+
+  const renderLeadsByCategory = () => {
+    const groupedLeads = groupLeadsByCategory(leads);
+    const categories = Object.keys(groupedLeads);
+
+    if (categories.length === 0) {
+      return (
+        <div className="no-leads">
+          <p>No leads found yet. Run a search to find potential leads.</p>
+        </div>
+      );
+    }
+
+    // Sort categories: hot first, then cold, then neutral, then others
+    const sortedCategories = categories.sort((a, b) => {
+      const order: Record<string, number> = { hot: 1, cold: 2, neutral: 3 };
+      return (order[a] || 4) - (order[b] || 4);
+    });
+
+    return (
+      <div className="leads-by-category">
+        {sortedCategories.map(category => (
+          <div key={category} className={`category-container category-${category}`}>
+            <div className="category-header">
+              <h3 className="category-title">
+                {getCategoryDisplayName(category)}
+              </h3>
+              <span className="category-count">
+                {groupedLeads[category].length}
+              </span>
+            </div>
+            <div className="leads-grid">
+              {groupedLeads[category].map((lead) => (
+                <div key={lead.id} className="lead-card">
+                  <h3 className="lead-title">{lead.title}</h3>
+                  <p className="lead-description">{lead.post_text}</p>
+                  <div className="lead-footer">
+                    <span className="lead-subreddit">r/{lead.subreddit_name}</span>
+                    <a 
+                      href={lead.url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="lead-link"
+                    >
+                      View
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   return (
     <div className="App">
       <header className="App-header">
@@ -239,30 +326,8 @@ function App() {
             
             {isLoadingLeads ? (
               <div className="loading">Loading leads...</div>
-            ) : leads.length > 0 ? (
-              <div className="leads-grid">
-                {leads.map((lead) => (
-                  <div key={lead.id} className="lead-card">
-                    <h3 className="lead-title">{lead.title}</h3>
-                    <p className="lead-description">{lead.post_text}</p>
-                    <div className="lead-footer">
-                      <span className="lead-subreddit">r/{lead.subreddit_name}</span>
-                      <a 
-                        href={lead.url} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="lead-link"
-                      >
-                        View
-                      </a>
-                    </div>
-                  </div>
-                ))}
-              </div>
             ) : (
-              <div className="no-leads">
-                <p>No leads found yet. Run a search to find potential leads.</p>
-              </div>
+              renderLeadsByCategory()
             )}
           </div>
         )}

@@ -6,14 +6,24 @@ from sqlalchemy.dialects.postgresql import insert
 from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from models import Base, Lead, SubredditToScan
+from typing import Optional
 
 load_dotenv()
 
 
 async def init_db():
     """Initialize the database and create tables if they don't exist"""
+    # Process the DATABASE_URL to handle sslmode parameter correctly
+    database_url = os.getenv("DATABASE_URL") or ""
+    # Replace postgresql: with postgresql+asyncpg:
+    database_url = re.sub(r"^postgresql:", "postgresql+asyncpg:", database_url)
+    # Remove sslmode parameter as it's not handled directly by asyncpg
+    database_url = re.sub(r"\?sslmode=require$", "", database_url)
+    database_url = re.sub(r"&sslmode=require", "", database_url)
+    database_url = re.sub(r"\?sslmode=require&", "?", database_url)
+
     engine = create_async_engine(
-        re.sub(r"^postgresql:", "postgresql+asyncpg:", os.getenv("DATABASE_URL") or ""),
+        database_url,
         echo=True,
     )
     async with engine.begin() as conn:
@@ -22,34 +32,55 @@ async def init_db():
     return engine
 
 
-async def save_leads(url_description_map: dict):
+async def save_leads(url_description_map: dict, subreddit_names: Optional[list] = None, category: str = "neutral"):
     """
     Save leads to the database
 
     Args:
-        url_description_map (dict): Dictionary with URLs as keys and descriptions as values
+        url_description_map (dict): Dictionary with identifiers as keys and descriptions as values
+        subreddit_names (list): List of subreddit names the leads came from
+        category (str): Category of the leads (hot, cold, neutral)
     """
     engine = await init_db()
     SessionLocal = async_sessionmaker(bind=engine)
 
     async with SessionLocal() as session:
-        for url, description in url_description_map.items():
-            # Extract ID from URL (assuming format https://reddit.com/comments/{id})
-            post_id = url.split("/")[-1] if "/" in url else url
+        for identifier, description in url_description_map.items():
+            # Extract ID from identifier
+            # No prefixing needed anymore as we're using actual Reddit IDs
+            subreddit_name = "unknown"
+            
+            # If we couldn't extract subreddit from URL, use the provided subreddit names
+            if subreddit_name == "unknown" and subreddit_names:
+                if isinstance(subreddit_names, list):
+                    subreddit_name = subreddit_names[0] if subreddit_names else "unknown"
+                elif isinstance(subreddit_names, str):
+                    subreddit_name = subreddit_names
+
+            # Extract URL from description if it's included
+            url = f"https://www.reddit.com/comments/{identifier}"  # Default URL
+            if "\n\nURL: " in description:
+                # Extract the URL from the description
+                parts = description.split("\n\nURL: ")
+                actual_description = parts[0]
+                url = parts[1] if len(parts) > 1 else url
+            else:
+                actual_description = description
 
             # Check if lead already exists
-            stmt = select(Lead).where(Lead.post_id == post_id)
+            stmt = select(Lead).where(Lead.post_id == identifier)
             result = await session.execute(stmt)
             existing_lead = result.scalar_one_or_none()
 
             if not existing_lead:
                 # Create new lead
                 lead = Lead(
-                    post_id=post_id,
-                    title=f"Lead from {post_id}",
-                    post_text=description,
+                    post_id=identifier,
+                    title=f"Lead from {identifier}",
+                    post_text=actual_description,
                     url=url,
-                    subreddit_name="unknown",  # We don't have this info in the current data structure
+                    subreddit_name=subreddit_name,
+                    category=category,  # Add category
                 )
                 session.add(lead)
 

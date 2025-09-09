@@ -35,6 +35,7 @@ class Lead(Base):
     post_text: Mapped[str | None] = mapped_column(TEXT)
     url: Mapped[str] = mapped_column(String(500))
     subreddit_name: Mapped[str] = mapped_column(String(100), index=True)
+    category: Mapped[str] = mapped_column(String(20), default="neutral", index=True)  # hot, cold, neutral
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

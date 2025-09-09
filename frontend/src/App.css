@@ -11,6 +11,9 @@
   --warning: #f59e0b;
   --error: #ef4444;
   --info: #6366f1;
+  --hot: #ef4444;
+  --cold: #3b82f6;
+  --neutral: #6b7280;
 }
 
 * {
@@ -40,7 +43,7 @@ body {
 }
 
 .header-content {
-  max-width: 800px;
+  max-width: 1200px;
   margin: 0 auto;
 }
 
@@ -88,7 +91,7 @@ body {
 }
 
 .App-main {
-  max-width: 800px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 1rem;
 }
@@ -312,10 +315,45 @@ body {
   color: var(--muted);
 }
 
+/* Category container styling */
+.category-container {
+  margin-bottom: 2rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.category-header {
+  padding: 1rem 1.5rem;
+  background-color: var(--card);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.category-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.category-count {
+  background-color: var(--background);
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
 .leads-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 1rem;
+  padding: 1.5rem;
 }
 
 .lead-card {
@@ -388,6 +426,39 @@ body {
   margin: 0;
 }
 
+.refresh-button {
+  background-color: var(--card);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.refresh-button:hover:not(:disabled) {
+  background-color: var(--card-hover);
+}
+
+.refresh-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Category-specific colors */
+.category-hot .category-title {
+  color: var(--hot);
+}
+
+.category-cold .category-title {
+  color: var(--cold);
+}
+
+.category-neutral .category-title {
+  color: var(--neutral);
+}
+
 @media (max-width: 768px) {
   .App-main {
     padding: 0.75rem;
@@ -405,9 +476,14 @@ body {
   
   .leads-grid {
     grid-template-columns: 1fr;
+    padding: 1rem;
   }
   
   .lead-card {
     padding: 1rem;
+  }
+  
+  .category-header {
+    padding: 0.75rem 1rem;
   }
 }
