@@ -71,3 +71,4 @@ async def get_reddit_data(subreddits=None):
 
     print(f"Extracted {len(posts_dict)} posts and {len(posts_comments)} comments")
     return posts_dict, posts_comments
+#komment 
